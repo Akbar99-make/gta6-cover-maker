@@ -6,6 +6,14 @@
 
 Vice Cover Studio — turn a photo and a caption into GTA 6-style cover art, offline in the browser.
 
+## What it does
+
+- Three layouts: multi-panel (hero + two small panels), single hero, split.
+- Your own photos: upload, or use the two samples. Drag to reposition, zoom, and frame each panel separately; fill every panel with one photo or use several.
+- Colour grades: Sunset (warm pink-orange), Neon (pink and cyan night), Noir (dark and moody).
+- Caption styles: white, gold or neon title lettering with a bold outline, plus a subtitle.
+- Live preview and one-click PNG export at 1080 × 1080, 1080 × 1350 and 1920 × 1080. Everything runs on your machine; photos are never uploaded.
+
 ## Run it
 
 ```sh
