@@ -1,40 +1,72 @@
-// Fixed scenes for screenshots: ?shot=editor shows the page with sample photos
-// loaded; ?shot=cover shows the cover alone, filling the viewport.
-// Query params: layout=multi|single|split, photo1/photo2/photo3=boulevard|pier,
-// grade=sunset|neon|noir, caption=classic|gold|neon,
-// title, sub, w, h (canvas pixels), ox1/oy1… per-panel framing offsets (-0.5..0.5).
-// window.__shotReady is set once painted.
+// Vice Cover Studio — the four screenshots the maker takes.
+// Each shot names its file, its viewport, whether it shows a bare cover or
+// the editor, and the cover preset it loads (photo, caption, layout, grade,
+// caption style and export size). The render script walks this list; the
+// editor reads ?shot=<id> to apply one preset on load.
 
-/** Reads a shot scene out of the page's query string. */
-export function parseShot(query) {
-  const pick = (key, fallback) => {
-    const v = query.get(key);
-    return v === 'boulevard' || v === 'pier' ? v : fallback;
-  };
-  const offset = (key) => {
-    const v = Number(query.get(key));
-    return Number.isFinite(v) ? Math.max(-0.5, Math.min(0.5, v)) : 0;
-  };
-  const layout = query.get('layout');
-  const grade = query.get('grade');
-  const caption = query.get('caption');
-  return {
-    mode: query.get('shot') === 'cover' ? 'cover' : 'editor',
-    layout: layout === 'single' || layout === 'split' ? layout : 'multi',
-    grade: grade === 'neon' || grade === 'noir' ? grade : 'sunset',
-    caption: caption === 'gold' || caption === 'neon' ? caption : 'classic',
-    photos: [pick('photo1', 'pier'), pick('photo2', 'boulevard'), pick('photo3', 'pier')],
-    offsets: [[offset('ox1'), offset('oy1')], [offset('ox2'), offset('oy2')], [offset('ox3'), offset('oy3')]],
-    title: query.get('title') ?? 'Sunset Heist',
-    sub: query.get('sub') ?? 'Vice City • One Last Score',
-    w: Number(query.get('w')) || 0,
-    h: Number(query.get('h')) || 0,
-  };
+export const COVER_SHOTS = [
+  {
+    id: 1,
+    file: '1-cover.jpg',
+    width: 1280,
+    height: 720,
+    kind: 'cover',
+    photo: 'samples/boulevard.jpg',
+    caption: 'SUNSET HEIST',
+    layout: 'hero',
+    grade: 'sunset',
+    captionStyle: 'white',
+    size: '1920x1080',
+  },
+  {
+    id: 2,
+    file: '2-editor.jpg',
+    width: 1280,
+    height: 1150,
+    kind: 'editor',
+    photo: 'samples/boulevard.jpg',
+    caption: 'SUNSET HEIST',
+    layout: 'hero',
+    grade: 'sunset',
+    captionStyle: 'white',
+    size: '1080x1080',
+  },
+  {
+    id: 3,
+    file: '3-cover.jpg',
+    width: 1024,
+    height: 1280,
+    kind: 'cover',
+    photo: 'samples/pier.jpg',
+    caption: 'NEON NIGHTS',
+    layout: 'split',
+    grade: 'neon',
+    captionStyle: 'neon',
+    size: '1080x1350',
+  },
+  {
+    id: 4,
+    file: '4-editor.jpg',
+    width: 1280,
+    height: 1150,
+    kind: 'editor',
+    photo: 'samples/pier.jpg',
+    caption: 'NEON NIGHTS',
+    layout: 'split',
+    grade: 'noir',
+    captionStyle: 'gold',
+    size: '1080x1350',
+  },
+];
+
+/** The shot with this id, or null. */
+export function shotPreset(id) {
+  const n = Number(id);
+  return COVER_SHOTS.find((s) => s.id === n) ?? null;
 }
 
-/** Marks the scene painted (two frames, so the canvas is really on screen). */
-export function markShotReady() {
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    window.__shotReady = true;
-  }));
+/** A shot's export size as { width, height }. */
+export function shotExportSize(shot) {
+  const [width, height] = String(shot.size).split('x').map(Number);
+  return { width, height };
 }
