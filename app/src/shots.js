@@ -1,6 +1,7 @@
 // Fixed scenes for screenshots: ?shot=editor shows the page with sample photos
 // loaded; ?shot=cover shows the cover alone, filling the viewport.
 // Query params: layout=multi|single|split, photo1/photo2/photo3=boulevard|pier,
+// grade=sunset|neon|noir, caption=classic|gold|neon,
 // title, sub, w, h (canvas pixels), ox1/oy1… per-panel framing offsets (-0.5..0.5).
 // window.__shotReady is set once painted.
 
@@ -15,9 +16,13 @@ export function parseShot(query) {
     return Number.isFinite(v) ? Math.max(-0.5, Math.min(0.5, v)) : 0;
   };
   const layout = query.get('layout');
+  const grade = query.get('grade');
+  const caption = query.get('caption');
   return {
     mode: query.get('shot') === 'cover' ? 'cover' : 'editor',
     layout: layout === 'single' || layout === 'split' ? layout : 'multi',
+    grade: grade === 'neon' || grade === 'noir' ? grade : 'sunset',
+    caption: caption === 'gold' || caption === 'neon' ? caption : 'classic',
     photos: [pick('photo1', 'pier'), pick('photo2', 'boulevard'), pick('photo3', 'pier')],
     offsets: [[offset('ox1'), offset('oy1')], [offset('ox2'), offset('oy2')], [offset('ox3'), offset('oy3')]],
     title: query.get('title') ?? 'Sunset Heist',

@@ -18,6 +18,8 @@ const zoomLabel = document.getElementById('zoom-value');
 const uploadInput = document.getElementById('upload');
 const panelButtons = [...document.querySelectorAll('[data-panel]')];
 const layoutButtons = [...document.querySelectorAll('[data-layout]')];
+const gradeButtons = [...document.querySelectorAll('[data-grade]')];
+const captionButtons = [...document.querySelectorAll('[data-caption]')];
 const sizeButtons = [...document.querySelectorAll('[data-size]')];
 const exportButtons = [...document.querySelectorAll('[data-export]')];
 
@@ -31,6 +33,8 @@ const state = {
   layout: 'multi',
   title: 'Sunset Heist',
   subtitle: 'Vice City • One Last Score',
+  grade: 'sunset',
+  caption: 'classic',
   previewSize: 'square',
   selected: 0,
   panels: [null, null, null],
@@ -63,6 +67,8 @@ function redraw() {
     layout: state.layout,
     title: state.title,
     subtitle: state.subtitle,
+    grade: state.grade,
+    caption: state.caption,
     panels: currentPanels(),
   });
   refreshPanelUI();
@@ -77,6 +83,8 @@ function refreshPanelUI() {
     btn.textContent = `Panel ${i + 1}${state.panels[i] ? ' ✓' : ''}`;
   });
   layoutButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.layout === state.layout));
+  gradeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.grade === state.grade));
+  captionButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.caption === state.caption));
   sizeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.size === state.previewSize));
 }
 
@@ -105,6 +113,8 @@ export async function exportPng(sizeKey) {
     layout: state.layout,
     title: state.title,
     subtitle: state.subtitle,
+    grade: state.grade,
+    caption: state.caption,
     panels: currentPanels(),
   });
   return new Promise((resolve) => off.toBlob(resolve, 'image/png'));
@@ -125,6 +135,16 @@ subInput.addEventListener('input', () => { state.subtitle = subInput.value; redr
 
 layoutButtons.forEach((btn) => btn.addEventListener('click', () => {
   state.layout = btn.dataset.layout;
+  redraw();
+}));
+
+gradeButtons.forEach((btn) => btn.addEventListener('click', () => {
+  state.grade = btn.dataset.grade;
+  redraw();
+}));
+
+captionButtons.forEach((btn) => btn.addEventListener('click', () => {
+  state.caption = btn.dataset.caption;
   redraw();
 }));
 
@@ -233,6 +253,8 @@ async function boot() {
     state.layout = shot.layout;
     state.title = shot.title;
     state.subtitle = shot.sub;
+    state.grade = shot.grade;
+    state.caption = shot.caption;
     titleInput.value = shot.title;
     subInput.value = shot.sub;
     state.previewSize = 'square';
@@ -251,7 +273,7 @@ async function boot() {
     // In shot mode the preview canvas keeps the requested pixel size.
     canvas.width = shot.w || canvas.width;
     canvas.height = shot.h || canvas.height;
-    drawCover(canvas, { layout: state.layout, title: state.title, subtitle: state.subtitle, panels: currentPanels() });
+    drawCover(canvas, { layout: state.layout, title: state.title, subtitle: state.subtitle, grade: state.grade, caption: state.caption, panels: currentPanels() });
     refreshPanelUI();
     markShotReady();
     return;

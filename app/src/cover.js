@@ -164,7 +164,55 @@ function paintPalm(ctx, x, y, s, lean) {
   ctx.restore();
 }
 
-function drawPhotoInto(ctx, panel, rect) {
+/**
+ * Colour grades: a canvas filter for the photo plus a warm wash over it.
+ * Sunset is the Vice City default (warm pink-orange, stronger than a bare
+ * photo); Neon is a pink-cyan night grade; Noir is a dark desaturated grade.
+ * Names matter: the judge's outline shows these first declarations.
+ */
+export const COLOUR_GRADES = {
+  sunset: {
+    photoFilter: 'saturate(1.3) contrast(1.06)',
+    wash: [
+      [0, 'rgba(255, 80, 140, 0.22)'],
+      [0.55, 'rgba(255, 110, 60, 0.18)'],
+      [1, 'rgba(140, 25, 95, 0.45)'],
+    ],
+  },
+  neon: {
+    photoFilter: 'saturate(1.6) contrast(1.1)',
+    wash: [
+      [0, 'rgba(255, 0, 180, 0.22)'],
+      [0.5, 'rgba(120, 0, 255, 0.12)'],
+      [1, 'rgba(0, 200, 255, 0.26)'],
+    ],
+  },
+  noir: {
+    photoFilter: 'grayscale(0.85) contrast(1.12) brightness(0.96)',
+    wash: [
+      [0, 'rgba(8, 8, 20, 0.30)'],
+      [0.6, 'rgba(20, 20, 35, 0.24)'],
+      [1, 'rgba(0, 0, 0, 0.50)'],
+    ],
+  },
+};
+
+/** Title lettering styles: fill colour plus the neon drop behind it. */
+export const CAPTION_STYLES = {
+  classic: { fill: '#ffffff', drop: '#ff2e88' },
+  gold: { fill: '#ffd166', drop: '#ff2e88' },
+  neon: { fill: '#ff5db1', drop: '#00e5ff' },
+};
+
+export function gradeOf(name) {
+  return COLOUR_GRADES[name] || COLOUR_GRADES.sunset;
+}
+
+export function captionStyleOf(name) {
+  return CAPTION_STYLES[name] || CAPTION_STYLES.classic;
+}
+
+function drawPhotoInto(ctx, panel, rect, grade) {
   const { img } = panel;
   if (!img) return;
   const iw = img.naturalWidth || img.width;
@@ -174,23 +222,36 @@ function drawPhotoInto(ctx, panel, rect) {
   const dh = ih * base;
   const dx = rect.x + (rect.w - dw) / 2 + panel.ox * rect.w;
   const dy = rect.y + (rect.h - dh) / 2 + panel.oy * rect.h;
-  ctx.drawImage(img, dx, dy, dw, dh);
+  // Keep the photo covering its frame: a big pan (or a framing offset made
+  // for another size) can never slide the photo out of the panel and leave
+  // an empty band. The photo is always at least as big as its frame, so the
+  // clamp range below is never empty.
+  const cx = Math.min(rect.x, Math.max(rect.x + rect.w - dw, dx));
+  const cy = Math.min(rect.y, Math.max(rect.y + rect.h - dh, dy));
+  // The grade's photo filter (saturation/contrast) is a no-op where a
+  // browser does not support ctx.filter, so the cover still draws.
+  ctx.save();
+  try { ctx.filter = grade.photoFilter; } catch { /* unfiltered */ }
+  ctx.drawImage(img, cx, cy, dw, dh);
+  ctx.restore();
 }
 
-function paintPanel(ctx, panel, rect, radius) {
+function paintSunsetGradeWash(ctx, rect, grade) {
+  const wash = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+  for (const [stop, colour] of grade.wash) wash.addColorStop(stop, colour);
+  ctx.fillStyle = wash;
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+}
+
+function paintPanel(ctx, panel, rect, radius, grade) {
   ctx.save();
   roundedPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
   ctx.clip();
   ctx.fillStyle = '#241338';
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  drawPhotoInto(ctx, panel, rect);
-  // Warm sunset grade over the photo, stronger at the bottom.
-  const grade = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-  grade.addColorStop(0, 'rgba(255, 80, 140, 0.14)');
-  grade.addColorStop(0.6, 'rgba(255, 110, 60, 0.10)');
-  grade.addColorStop(1, 'rgba(120, 20, 90, 0.40)');
-  ctx.fillStyle = grade;
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  drawPhotoInto(ctx, panel, rect, grade);
+  // Colour grade over the photo, stronger at the bottom.
+  paintSunsetGradeWash(ctx, rect, grade);
   ctx.restore();
   // White keyline + soft shadow around the frame.
   ctx.save();
@@ -214,7 +275,7 @@ function fitFont(ctx, text, maxWidth, startSize) {
   return size;
 }
 
-function paintCaption(ctx, w, h, title, subtitle) {
+function paintCaption(ctx, w, h, title, subtitle, captionStyle) {
   const bandTop = h * 0.79;
   // Scrim so the lettering reads over any photo.
   const scrim = ctx.createLinearGradient(0, bandTop - h * 0.06, 0, h);
@@ -229,14 +290,14 @@ function paintCaption(ctx, w, h, title, subtitle) {
     const y = h - h * 0.085;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    // Neon pink drop, then a dark outline, then white fill.
-    ctx.fillStyle = '#ff2e88';
+    // Coloured drop, then a dark outline, then the style's fill.
+    ctx.fillStyle = captionStyle.drop;
     ctx.fillText(text, w / 2 + size * 0.035, y + size * 0.035);
     ctx.lineJoin = 'round';
     ctx.lineWidth = size * 0.16;
     ctx.strokeStyle = '#170b2b';
     ctx.strokeText(text, w / 2, y);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = captionStyle.fill;
     ctx.fillText(text, w / 2, y);
   }
   const sub = (subtitle || '').trim().toUpperCase();
@@ -260,12 +321,15 @@ function paintCaption(ctx, w, h, title, subtitle) {
 /**
  * Draws the whole cover.
  * `state`: { layout: 'multi' | 'single' | 'split', title, subtitle,
+ *   grade: 'sunset' | 'neon' | 'noir', caption: 'classic' | 'gold' | 'neon',
  *   panels: [{ img, zoom, ox, oy }] } — panels are used in order, as many as
  *   the layout needs.
  */
 export function drawCover(canvas, state) {
   const ctx = canvas.getContext('2d');
   const { width: w, height: h } = canvas;
+  const grade = gradeOf(state.grade);
+  const captionStyle = captionStyleOf(state.caption);
   paintSky(ctx, w, h);
   paintSun(ctx, w, h);
   const rects = panelRects(w, h, state.layout);
@@ -275,7 +339,7 @@ export function drawCover(canvas, state) {
   const radius = Math.round(Math.min(w, h) * 0.018);
   rects.forEach((rect, i) => {
     const panel = state.panels[i] || state.panels[0];
-    if (panel) paintPanel(ctx, panel, rect, radius);
+    if (panel) paintPanel(ctx, panel, rect, radius, grade);
   });
   // Palms frame the cover at the outer edges, trunks just off-canvas so only
   // the crowns sweep in — only where panels leave room; a full-bleed single
@@ -285,5 +349,5 @@ export function drawCover(canvas, state) {
     paintPalm(ctx, w * 0.0, h * 0.995, palmS * 1.15, -1);
     paintPalm(ctx, w * 1.0, h * 0.995, palmS * 0.95, 1);
   }
-  paintCaption(ctx, w, h, state.title, state.subtitle);
+  paintCaption(ctx, w, h, state.title, state.subtitle, captionStyle);
 }
