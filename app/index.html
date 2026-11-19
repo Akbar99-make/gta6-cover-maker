@@ -47,13 +47,28 @@
     </div>
 
     <div class="group">
-      <h2>3 · Caption</h2>
-      <label>Title <input id="title" type="text" maxlength="32" value="Sunset Heist"></label>
-      <label>Subtitle <input id="subtitle" type="text" maxlength="48" value="Vice City • One Last Score"></label>
+      <h2>3 · Colour grade</h2>
+      <div class="row tight">
+        <button type="button" data-grade="sunset" class="active">Sunset</button>
+        <button type="button" data-grade="neon">Neon</button>
+        <button type="button" data-grade="noir">Noir</button>
+      </div>
+      <p class="hint">Sunset warms the photo, Neon turns it pink and cyan, Noir makes it dark and moody.</p>
     </div>
 
     <div class="group">
-      <h2>4 · Preview size</h2>
+      <h2>4 · Caption</h2>
+      <label>Title <input id="title" type="text" maxlength="32" value="Sunset Heist"></label>
+      <label>Subtitle <input id="subtitle" type="text" maxlength="48" value="Vice City • One Last Score"></label>
+      <div class="row tight">
+        <button type="button" data-caption="classic" class="active">White title</button>
+        <button type="button" data-caption="gold">Gold title</button>
+        <button type="button" data-caption="neon">Neon title</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>5 · Preview size</h2>
       <div class="row tight">
         <button type="button" data-size="square" class="active">1080 × 1080</button>
         <button type="button" data-size="portrait">1080 × 1350</button>
@@ -62,7 +77,7 @@
     </div>
 
     <div class="group">
-      <h2>5 · Export PNG</h2>
+      <h2>6 · Export PNG</h2>
       <div class="row tight export-row">
         <button type="button" data-export="square">1080 × 1080</button>
         <button type="button" data-export="portrait">1080 × 1350</button>
