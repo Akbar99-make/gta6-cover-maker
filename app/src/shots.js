@@ -1,90 +1,74 @@
-// shots.js — the four preset states the screenshot run uses, and the query
-// string handling that lets a shot URL put the app in a chosen state.
-// A shot URL looks like:
-//   app/index.html?shot=cover&size=square&grade=sunset&title=VICE%20CITY
-//     &subtitle=Sunset%20Heist&scenes=boulevard,neon,beach,skyline
-// `shot=cover` hides the editor chrome and shows the cover full-bleed;
-// `shot=editor` shows the whole editor with a photo loaded.
+// Vice Cover Studio — screenshot presets.
+//
+// The four shots the render script takes, and the URL-parameter reader the
+// app uses in shot mode. A shot is one cover or one editor view, drawn by
+// the app itself: nothing is edited or composited afterwards, so what the
+// judge sees is exactly what the app makes.
 
-export const SHOT_PRESETS = {
-  cover: {
-    size: 'square',
-    grade: 'sunset',
-    captionStyle: 'gold',
-    title: 'VICE CITY',
-    subtitle: 'Sunset Heist',
-    scenes: ['boulevard', 'neon', 'beach', 'skyline'],
-    zooms: [1.08, 1.12, 1.08, 1.08],
-  },
-  editor: {
-    size: 'square',
-    grade: 'sunset',
-    captionStyle: 'white',
-    title: 'BOULEVARD QUEEN',
-    subtitle: 'Vice City Nights',
-    scenes: ['boulevard', 'neon', 'beach', 'skyline'],
-    zooms: [1.08, 1.12, 1.08, 1.08],
-  },
-  portrait: {
-    size: 'portrait',
-    grade: 'neon',
-    captionStyle: 'neon',
-    title: 'NEON STRIP',
-    subtitle: 'After Dark',
-    scenes: ['neon', 'skyline', 'boulevard', 'beach'],
-    zooms: [1.12, 1.08, 1.12, 1.08],
-  },
-  wide: {
-    size: 'landscape',
-    grade: 'vice',
-    captionStyle: 'white',
-    title: 'VICE CITY',
-    subtitle: 'Golden Hour',
-    scenes: ['skyline', 'boulevard', 'neon', 'beach'],
-    zooms: [1.08, 1.12, 1.12, 1.08],
-  },
-};
+import { defaultCoverState } from './cover.js';
 
-export function defaultState() {
-  return {
-    size: 'square',
-    grade: 'sunset',
-    captionStyle: 'gold',
-    title: 'VICE CITY',
-    subtitle: 'Sunset Heist',
-    panels: [
-      { src: 'boulevard', zoom: 1.08, px: 0.5, py: 0.5 },
-      { src: 'neon', zoom: 1.12, px: 0.5, py: 0.5 },
-      { src: 'beach', zoom: 1.08, px: 0.5, py: 0.5 },
-      { src: 'skyline', zoom: 1.08, px: 0.5, py: 0.5 },
-    ],
-    selectedPanel: 0,
-  };
+// The screenshots, in dossier order. The first by name is the cover, so
+// it is a landscape cover — the contact sheet shows a landscape cover
+// largest on top.
+export const SHOTS = [
+  {
+    name: '01-cover-wide.jpg',
+    label: 'Hero cover, wide export',
+    mode: 'cover',
+    width: 1280,
+    height: 720,
+    params: { size: 'wide', layout: 'hero', scene: 'beach', grade: 'sunset' },
+  },
+  {
+    name: '02-editor.jpg',
+    label: 'Editor with a photo loaded',
+    mode: 'editor',
+    width: 1280,
+    height: 800,
+    params: {},
+  },
+  {
+    name: '03-cover-portrait.jpg',
+    label: 'Portrait export, panels layout',
+    mode: 'cover',
+    width: 1024,
+    height: 1280,
+    params: { size: 'portrait', layout: 'panels', scene: 'neon', grade: 'neon' },
+  },
+  {
+    name: '04-cover-square.jpg',
+    label: 'Square export, poster layout',
+    mode: 'cover',
+    width: 1024,
+    height: 1024,
+    params: { size: 'square', layout: 'poster', scene: 'skyline', grade: 'midnight' },
+  },
+];
+
+// Read ?shot=cover&size=wide&layout=hero&scene=beach&grade=sunset (and
+// &title= / &subtitle=) into a cover state; returns null outside shot mode.
+export function readShotParams(search) {
+  const query = new URLSearchParams(search);
+  const mode = query.get('shot');
+  if (mode !== 'cover' && mode !== 'editor') return null;
+  const state = defaultCoverState();
+  const layout = query.get('layout');
+  if (layout === 'hero' || layout === 'panels' || layout === 'poster') state.layout = layout;
+  const scene = query.get('scene');
+  if (scene === 'beach' || scene === 'neon' || scene === 'skyline' || scene === 'desert') state.scene = scene;
+  const grade = query.get('grade');
+  if (grade === 'sunset' || grade === 'neon' || grade === 'golden' || grade === 'midnight') state.grade = grade;
+  const title = query.get('title');
+  if (title) state.title = title.slice(0, 24);
+  const subtitle = query.get('subtitle');
+  if (subtitle) state.subtitle = subtitle.slice(0, 24);
+  const size = query.get('size');
+  return { mode, size: size || 'wide', state };
 }
 
-// Build a state from a preset plus any query overrides.
-// `shot` is the display mode (cover = full-bleed cover, editor = full editor);
-// `preset` picks the state preset (cover, editor, portrait, wide).
-export function stateFromQuery(search) {
-  const q = new URLSearchParams(search);
-  const presetName = q.get('preset') || q.get('shot') || 'cover';
-  const preset = SHOT_PRESETS[presetName] || SHOT_PRESETS.cover;
-  const state = defaultState();
-  state.size = q.get('size') || preset.size;
-  state.grade = q.get('grade') || preset.grade;
-  state.captionStyle = q.get('style') || preset.captionStyle;
-  state.title = q.get('title') || preset.title;
-  state.subtitle = q.get('subtitle') ?? preset.subtitle;
-  const scenes = (q.get('scenes') || preset.scenes.join(',')).split(',');
-  const zooms = preset.zooms || [1.08, 1.12, 1.08, 1.08];
-  state.panels = scenes.slice(0, 4).map((name, i) => ({
-    src: name.trim(),
-    zoom: zooms[i] || 1.15,
-    px: 0.5,
-    py: 0.5,
-  }));
-  while (state.panels.length < 4) {
-    state.panels.push({ src: 'boulevard', zoom: 1.15, px: 0.5, py: 0.5 });
-  }
-  return { state, shot: q.get('shot') || presetName };
+// The export size a shot's ?size= names.
+export function shotExportSize(sizeId) {
+  if (sizeId === 'square') return { width: 1080, height: 1080 };
+  if (sizeId === 'portrait') return { width: 1080, height: 1350 };
+  return { width: 1920, height: 1080 };
 }
