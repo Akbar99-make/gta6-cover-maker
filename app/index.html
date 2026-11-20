@@ -1,82 +1,98 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vice Cover Studio — GTA-style cover art maker</title>
-<link rel="stylesheet" href="style.css">
+<title>Vice Cover Studio — GTA-style cover maker</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header class="topbar">
-  <h1>VICE COVER STUDIO</h1>
-  <p class="tagline">Turn your photo and a caption into GTA-style cover art. Offline, on your machine.</p>
+  <div class="brand">
+    <span class="brand-mark">☀</span>
+    <div>
+      <h1>VICE COVER STUDIO</h1>
+      <p>Turn your photo into GTA-style cover art — offline, in your browser.</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button id="shuffleBtn" type="button" class="ghost-btn">Shuffle scenes</button>
+    <button id="exportBtn" type="button" class="export-btn">Export PNG ↓</button>
+  </div>
 </header>
-<main class="studio">
-  <section class="controls" aria-label="Cover editor">
-    <div class="group">
-      <h2>1 · Photo</h2>
-      <label class="file-label" for="photoFile">Upload a photo</label>
-      <input id="photoFile" type="file" accept="image/*">
-      <div class="row">
-        <button id="sampleBoulevard" type="button" class="chip">Boulevard sample</button>
-        <button id="samplePier" type="button" class="chip">Pier sample</button>
-      </div>
-      <p class="hint">Loaded: <span id="photoName">boulevard.jpg</span></p>
-    </div>
 
-    <div class="group">
-      <h2>2 · Caption</h2>
-      <input id="captionText" type="text" value="SUNSET HEIST" maxlength="48" aria-label="Caption">
+<main class="layout">
+  <section class="preview-col">
+    <div class="preview-frame">
+      <canvas id="preview" width="1080" height="1080"></canvas>
     </div>
-
-    <div class="group">
-      <h2>3 · Panels</h2>
-      <div class="row">
-        <button type="button" class="chip" data-layout="hero">Hero</button>
-        <button type="button" class="chip" data-layout="split">Split</button>
-        <button type="button" class="chip" data-layout="stack">Stack</button>
-      </div>
-      <div id="panelPicker" class="row" aria-label="Pick a panel to crop"></div>
-      <label for="panX">Pan left / right <span id="panXValue">0</span></label>
-      <input id="panX" type="range" min="-100" max="100" value="0">
-      <label for="panY">Pan up / down <span id="panYValue">0</span></label>
-      <input id="panY" type="range" min="-100" max="100" value="0">
-      <label for="zoom">Zoom <span id="zoomValue">100%</span></label>
-      <input id="zoom" type="range" min="100" max="200" value="100">
-    </div>
-
-    <div class="group">
-      <h2>4 · Colour grade</h2>
-      <div class="row">
-        <button type="button" class="chip" data-grade="sunset">Sunset</button>
-        <button type="button" class="chip" data-grade="neon">Neon</button>
-        <button type="button" class="chip" data-grade="noir">Noir</button>
-      </div>
-    </div>
-
-    <div class="group">
-      <h2>5 · Caption style</h2>
-      <div class="row">
-        <button type="button" class="chip" data-caption-style="white">White</button>
-        <button type="button" class="chip" data-caption-style="gold">Gold</button>
-        <button type="button" class="chip" data-caption-style="neon">Neon</button>
-      </div>
-    </div>
-
-    <div class="group">
-      <h2>6 · Export size</h2>
-      <div id="sizeButtons" class="row"></div>
-      <button id="exportPng" type="button" class="export">Export PNG</button>
-      <p id="downloadNote" class="hint" role="status"></p>
-    </div>
+    <p class="hint">Click a panel on the cover to select it, then change its photo, zoom or position. The export is exactly what you see here.</p>
+    <p id="status" class="status" aria-live="polite"></p>
   </section>
 
-  <section class="preview-pane" aria-label="Live preview">
-    <h2>Live preview</h2>
-    <canvas id="preview" width="560" height="315"></canvas>
-    <p class="hint">The preview is the cover: what you see is what the PNG holds.</p>
-  </section>
+  <aside class="controls">
+    <section class="group">
+      <h2>1 · Size</h2>
+      <div class="seg">
+        <button type="button" data-size="square">Square<br><small>1080 × 1080</small></button>
+        <button type="button" data-size="portrait">Portrait<br><small>1080 × 1350</small></button>
+        <button type="button" data-size="landscape">Wide<br><small>1920 × 1080</small></button>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>2 · Pick a panel</h2>
+      <div id="panelPicker" class="seg wrap"></div>
+      <p id="panelLabel" class="panel-label">Panel 1 · Hero</p>
+      <h3>Photo for this panel</h3>
+      <div id="scenePicker" class="scene-picker"></div>
+      <label class="upload-btn">Upload your own photo
+        <input id="photoFile" type="file" accept="image/*">
+      </label>
+    </section>
+
+    <section class="group">
+      <h2>3 · Crop &amp; position</h2>
+      <label class="slider-label">Zoom <span id="zoomVal">115%</span>
+        <input id="zoomRange" type="range" min="1" max="2.2" step="0.01" value="1.15">
+      </label>
+      <label class="slider-label">Pan left – right
+        <input id="panXRange" type="range" min="0" max="1" step="0.01" value="0.5">
+      </label>
+      <label class="slider-label">Pan up – down
+        <input id="panYRange" type="range" min="0" max="1" step="0.01" value="0.5">
+      </label>
+    </section>
+
+    <section class="group">
+      <h2>4 · Caption</h2>
+      <label class="field">Title
+        <input id="titleInput" type="text" value="VICE CITY" maxlength="24">
+      </label>
+      <label class="field">Subtitle
+        <input id="subtitleInput" type="text" value="Sunset Heist" maxlength="40">
+      </label>
+      <div class="seg">
+        <button type="button" data-style="white">White</button>
+        <button type="button" data-style="gold">Gold</button>
+        <button type="button" data-style="neon">Neon</button>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>5 · Colour grade</h2>
+      <div class="seg">
+        <button type="button" data-grade="sunset">🌇 Sunset</button>
+        <button type="button" data-grade="neon">🌃 Neon</button>
+        <button type="button" data-grade="noir">🎞 Noir</button>
+        <button type="button" data-grade="vice">🌊 Vice</button>
+      </div>
+      <p class="note">The grade washes the whole cover — sunset gold, neon pink-cyan, high-contrast noir, or teal-pink Vice. Original art only: no Rockstar logos, artwork or fonts.</p>
+    </section>
+  </aside>
 </main>
-<script type="module" src="src/main.js"></script>
+
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>
