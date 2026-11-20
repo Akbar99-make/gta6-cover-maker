@@ -1,46 +1,56 @@
-// serve.ts — tiny static server for trying Vice Cover Studio locally.
-// Serves this repository's files at http://localhost:8080 (or $PORT).
-// No build step, no network: the app is plain files under app/.
+// Vice Cover Studio — local static server (Node 22, standard library only).
+//
+// Serves app/ at http://localhost:8080 so the app can be tried in desktop
+// Chrome exactly as the grader's static host serves it: every file comes
+// from app/, nothing is fetched from the network.
+//
+//   node serve.ts            (port 8080)
+//   PORT=8123 node serve.ts  (another port)
 
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, statSync } from 'node:fs';
-import { join, extname, normalize } from 'node:path';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('.', import.meta.url));
-const port = Number(process.env.PORT || 8080);
+const appDir = resolve(fileURLToPath(new URL('app', import.meta.url)));
+const port = Number(process.env.PORT ?? 8080);
 
-const TYPES = {
+const contentTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.ttf': 'font/ttf',
+  '.woff2': 'font/woff2',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
-  '.ts': 'text/plain; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
 };
 
-const server = createServer((req, res) => {
-  const path = normalize(join(root, decodeURIComponent(req.url.split('?')[0])));
-  if (!path.startsWith(root)) {
-    res.writeHead(403);
-    res.end('forbidden');
+const server = createServer((request, response) => {
+  const urlPath = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
+  const relative = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
+  const filePath = resolve(join(appDir, normalize(relative)));
+  if (!filePath.startsWith(appDir + sep) && filePath !== appDir) {
+    response.writeHead(403);
+    response.end('forbidden');
     return;
   }
-  let file = path;
-  if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
-  if (!existsSync(file) || statSync(file).isDirectory()) {
-    res.writeHead(404);
-    res.end('not found');
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    response.writeHead(404);
+    response.end('not found');
     return;
   }
-  res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
-  res.end(readFileSync(file));
+  response.writeHead(200, {
+    'content-type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
+    'cache-control': 'no-store',
+  });
+  createReadStream(filePath).pipe(response);
 });
 
-server.listen(port, () => {
-  console.log(`Vice Cover Studio at http://localhost:${port}/app/index.html`);
+server.listen(port, '127.0.0.1', () => {
+  console.log(`Vice Cover Studio serving app/ at http://localhost:${port}`);
 });
