@@ -1,113 +1,134 @@
-// render-shots.mjs — take the entry's screenshots with headless Chrome.
-// Reads shots.json, serves the app, screenshots each shot URL at its window
-// size, then converts to JPEG inside the bounty limits (long side at most
-// 1280, short side at least 480, at most 256 KiB) with Python/Pillow.
+// Vice Cover Studio — screenshot maker (Node 22, standard library only).
 //
-// Usage: node render-shots.mjs
-//   CHROME_BIN=/path/to/chrome  (default: the Playwright-bundled Chromium)
-//   PORT=8123                   (default: 8123)
+// Serves app/ locally, loads each shot from SHOTS in headless Chromium,
+// screenshots it, and converts the PNG to a JPEG inside the gate's limits
+// (long side at most 1280, short side at least 480, at most 256 KiB).
+// Every screenshot is drawn by the app itself in this session: a cover
+// shot is the app's own cover drawn edge to edge, an editor shot is the
+// app in the browser with the demo photo loaded. Nothing is edited or
+// composited afterwards.
+//
+//   node render-shots.mjs
+//
+// The Chromium binary is the Playwright cache's headless shell; override
+// it with CHROME_BIN. The server port can be overridden with SHOT_PORT.
 
 import { spawn, execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SHOTS } from './app/src/shots.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const shots = JSON.parse(readFileSync(join(here, 'shots.json'), 'utf8'));
-const outDir = join(here, 'screenshots');
-mkdirSync(outDir, { recursive: true });
-const tmpDir = join(here, '.shots-tmp');
-mkdirSync(tmpDir, { recursive: true });
+const repoRoot = fileURLToPath(new URL('.', import.meta.url));
+const shotsDir = join(repoRoot, 'screenshots');
+const port = Number(process.env.SHOT_PORT ?? 8123);
+const chromeBin =
+  process.env.CHROME_BIN ??
+  join(
+    process.env.HOME ?? '/root',
+    '.cache/ms-playwright/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell',
+  );
 
-const CHROME = process.env.CHROME_BIN
-  || join(process.env.HOME || '', '.cache/ms-playwright/chromium-1255/chrome-linux64/chrome');
-const PORT = process.env.PORT || '8123';
-
-function run(cmd, args, opts = {}) {
+function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: 'pipe', ...opts });
-    let err = '';
-    p.stderr.on('data', (d) => { err += d; });
-    p.on('error', reject);
-    p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} exited ${code}: ${err.slice(-500)}`))));
-  });
-}
-
-function waitForServer(url, tries = 40) {
-  return new Promise((resolve, reject) => {
-    const tick = async () => {
-      try {
-        const r = await fetch(url);
-        if (r.ok) return resolve();
-      } catch { /* not up yet */ }
-      if (--tries <= 0) return reject(new Error('server did not come up'));
-      setTimeout(tick, 250);
-    };
-    tick();
-  });
-}
-
-// Convert + resize each raw PNG to a JPEG inside the bounty limits.
-const CONVERT_PY = `
-import sys, os
-from PIL import Image
-for png in sys.argv[1:]:
-    im = Image.open(png).convert('RGB')
-    w, h = im.size
-    scale = min(1.0, 1280 / max(w, h))
-    if scale < 1.0:
-        im = im.resize((round(w * scale), round(h * scale)), Image.LANCZOS)
-    w, h = im.size
-    if min(w, h) < 480:
-        s = 480 / min(w, h)
-        im = im.resize((round(w * s), round(h * s)), Image.LANCZOS)
-    name = os.path.splitext(os.path.basename(png))[0] + '.jpg'
-    out = os.path.join(os.environ['OUT_DIR'], name)
-    q = 90
-    while q >= 55:
-        im.save(out, 'JPEG', quality=q, optimize=True)
-        if os.path.getsize(out) <= 262144:
-            break
-        q -= 6
-    print(out, im.size, os.path.getsize(out), 'bytes, quality', q)
-`;
-
-async function main() {
-  const server = spawn('node', ['serve.ts'], {
-    cwd: here,
-    env: { ...process.env, PORT },
-    stdio: 'pipe',
-  });
-  try {
-    await waitForServer(`http://localhost:${PORT}/app/index.html`);
-    for (const shot of shots) {
-      const raw = join(tmpDir, shot.name.replace(/\.jpg$/i, '.png'));
-      const url = `http://localhost:${PORT}/app/index.html${shot.query}`;
-      await run(CHROME, [
-        '--headless=new', '--disable-gpu', '--no-sandbox',
-        '--hide-scrollbars', '--force-device-scale-factor=1',
-        `--window-size=${shot.w},${shot.h}`,
-        '--virtual-time-budget=9000',
-        `--screenshot=${raw}`,
-        url,
-      ]);
-      console.log('shot', shot.name, '->', raw);
-    }
-  } finally {
-    server.kill();
-  }
-
-  const raws = readdirSync(tmpDir).filter((f) => f.endsWith('.png')).map((f) => join(tmpDir, f));
-  await new Promise((resolve, reject) => {
-    execFile('python3', ['-c', CONVERT_PY, ...raws], {
-      env: { ...process.env, OUT_DIR: outDir },
-    }, (err, stdout, stderr) => {
-      process.stdout.write(stdout);
-      process.stderr.write(stderr);
-      err ? reject(err) : resolve();
+    execFile(command, args, { maxBuffer: 64 * 1024 * 1024, ...options }, (error, stdout, stderr) => {
+      if (error) reject(new Error(`${command} failed: ${stderr || error.message}`));
+      else resolve(stdout);
     });
   });
-  console.log('done — screenshots in', outDir);
 }
 
-main().catch((e) => { console.error(e.message); process.exit(1); });
+async function waitForServer(url, tries = 40) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch {
+      // Not up yet.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`server did not answer at ${url}`);
+}
+
+// Convert a PNG screenshot to a JPEG inside the gate's limits, stepping
+// the quality down until it fits 256 KiB. Prints the final dimensions.
+async function pngToJpeg(pngPath, jpegPath) {
+  const python = `
+import sys
+from PIL import Image
+png_path, jpeg_path = sys.argv[1], sys.argv[2]
+image = Image.open(png_path).convert('RGB')
+for quality in (90, 84, 76, 68, 60, 52):
+    image.save(jpeg_path, 'JPEG', quality=quality, optimize=True)
+    import os
+    size = os.path.getsize(jpeg_path)
+    print(f"  jpeg quality={quality} size={size} bytes {image.width}x{image.height}")
+    if size <= 262144:
+        break
+`;
+  await run('python3', ['-c', python, pngPath, jpegPath]);
+  const size = statSync(jpegPath).size;
+  if (size > 262144) throw new Error(`${jpegPath} is ${size} bytes, still over 256 KiB`);
+}
+
+async function takeShot(shot, workDir) {
+  const params = new URLSearchParams({ shot: shot.mode, ...shot.params });
+  const url = `http://127.0.0.1:${port}/?${params.toString()}`;
+  const pngPath = join(workDir, `${shot.name}.png`);
+  const jpegPath = join(shotsDir, shot.name);
+  console.log(`${shot.name} — ${shot.label}`);
+  console.log(`  ${url}  (${shot.width}x${shot.height})`);
+  await run(chromeBin, [
+    '--headless',
+    '--disable-gpu',
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    '--hide-scrollbars',
+    '--force-device-scale-factor=1',
+    `--user-data-dir=${join(workDir, 'chrome-profile')}`,
+    `--window-size=${shot.width},${shot.height}`,
+    '--virtual-time-budget=12000',
+    `--screenshot=${pngPath}`,
+    url,
+  ]);
+  if (!existsSync(pngPath)) throw new Error(`no screenshot written for ${shot.name}`);
+  await pngToJpeg(pngPath, jpegPath);
+}
+
+async function main() {
+  // Start from a clean screenshots/ folder: stale shots from earlier
+  // rounds must not survive beside the fresh ones (the gate allows 4).
+  mkdirSync(shotsDir, { recursive: true });
+  for (const name of readdirSync(shotsDir)) {
+    if (/\.(png|jpe?g)$/i.test(name)) rmSync(join(shotsDir, name));
+  }
+  const workDir = join(tmpdir(), 'vice-cover-shots');
+  mkdirSync(workDir, { recursive: true });
+
+  const server = spawn('node', ['serve.ts'], {
+    cwd: repoRoot,
+    env: { ...process.env, PORT: String(port) },
+    stdio: 'ignore',
+  });
+  try {
+    await waitForServer(`http://127.0.0.1:${port}/`);
+    for (const shot of SHOTS) {
+      await takeShot(shot, workDir);
+    }
+  } finally {
+    server.kill('SIGTERM');
+  }
+
+  console.log('\nScreenshots in screenshots/:');
+  for (const name of readdirSync(shotsDir).sort()) {
+    console.log(`  ${name} — ${statSync(join(shotsDir, name)).size} bytes`);
+  }
+  writeFileSync(join(workDir, 'shots-done.txt'), 'done\n');
+}
+
+main().catch((error) => {
+  console.error(error.message);
+  process.exit(1);
+});

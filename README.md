@@ -1,77 +1,72 @@
 # Vice Cover Studio
 
-[![make.fun · gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/bounty/gta6-cover-art-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
-[![rank](https://make.fun/badge/gta6-cover-art-01/Akbar99-make/gta6-cover-maker/rank.svg)](https://make.fun/bounty/gta6-cover-art-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
-[![reward](https://make.fun/badge/gta6-cover-art-01/Akbar99-make/gta6-cover-maker/reward.svg)](https://make.fun/bounty/gta6-cover-art-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
-
-Turn a photo and a caption into GTA 6-style multi-panel cover art — offline, in your browser.
+Turn any photo into GTA-style cover art — a web app that runs offline in
+desktop Chrome. Pick a photo, pick a scene, layout and colour grade, write
+your caption, and export a share-ready PNG.
 
 ## What it does
 
-Vice Cover Studio is an offline static web app. Pick a scene, set a caption, and export a striking cover in three post sizes. No account, no upload, no network needed.
+- **Any photo** — upload your own photos (or use the built-in demo
+  portrait, a flat illustration drawn in code). Drag the preview to move
+  the photo, zoom it, and switch photos per panel from the strip.
+- **Four procedural scenes** — Sunset Beach, Neon Street, Night Skyline and
+  Desert Highway, all drawn on canvas. No photo files ship with the app.
+- **Three layouts** — Hero (one big full-bleed photo), Panels (hero plus two
+  scene panels) and Poster (a framed poster with a title band).
+- **Four colour grades** — Vice Sunset, Neon Nights, Golden Hour and
+  Midnight, plus film grain and a vignette on every cover.
+- **Bold lettering** — a huge Anton title with a hard shadow and keyline,
+  and a tilted Pacifico script subtitle.
+- **Fast export** — one click writes a PNG in 1080 × 1080, 1080 × 1350 or
+  1920 × 1080.
 
-- **4-panel collage** — Hero, Top, Mid, and Strip panels with white gutters, laid out for square, portrait, and wide covers.
-- **4 procedural scenes, drawn in code** — Sunset Blvd, Neon Strip, Beach Palms, and Downtown. Every skyline, palm, neon sign, and sunset is painted by code; no photo assets are bundled.
-- **4 colour grades** — Sunset, Neon, Noir, and Vice washes across the whole cover, plus a vignette.
-- **3 caption styles** — White, Gold, and Neon, in big bold condensed lettering with a strong outline.
-- **Per-panel control** — click a panel in the preview to select it, then change its scene, upload your own photo, and adjust zoom and pan.
-- **Upload your own photo** — drop a photo into any panel and crop it with the zoom and pan sliders.
-- **Editable title and subtitle** — type your own cover line and tagline.
-- **Shuffle scenes** — one click re-rolls the scene of every panel.
-- **PNG export** — 1080x1080 square, 1080x1350 portrait, and 1920x1080 wide.
-
-No Rockstar assets or fonts are used. All art is original and drawn in code.
-
-## How to run
-
-Serve the `app/` folder with any static server and open it in a browser:
-
-```sh
-npx serve app
-```
-
-Or run the bundled server:
+## Run it
 
 ```sh
 node serve.ts
 ```
 
-Then open the printed address in your browser.
+Then open http://localhost:8080 in desktop Chrome. Everything loads from
+`app/` — no network request is made at runtime, and photos are read on
+your own machine, never uploaded.
 
-## Repository layout
+## Make the screenshots
 
-- `app/` — the static web app (HTML, CSS, and the cover engine in `app/src/`).
-- `app/src/scenes.js` — the four procedural scenes, drawn in code.
-- `app/src/cover.js` — the cover renderer (panels, grades, lettering).
-- `app/src/main.js` — the editor (panel picker, photo upload, zoom and pan, export).
-- `app/src/shots.js` — screenshot mode for the four dossier shots.
-- `main.ts` — the make.fun dossier entrypoint.
-- `render-shots.mjs` — re-renders the screenshots in `screenshots/`.
-- `screenshots/` — four screenshots of the cover and the editor.
-- `serve.ts` — a tiny static server for local use.
-- `vendor/` — the make.fun app helper (do not edit).
+```sh
+node render-shots.mjs
+```
 
-## Screenshots
+It serves the app, loads each shot in headless Chromium and writes four
+JPEGs into `screenshots/` (the first by name is the cover). The shots are
+listed in `shots.json` and in `app/src/shots.js`.
 
-The cover and the editor, as rendered by `render-shots.mjs`:
+## Hand in the entry
 
-- `screenshots/1-cover.jpg` — square cover, "VICE CITY".
-- `screenshots/2-editor.jpg` — the editor with the Hero panel selected.
-- `screenshots/3-cover.jpg` — portrait cover, "NEON STRIP".
-- `screenshots/4-editor.jpg` — the editor, portrait size selected.
+```sh
+mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+```
+
+`main.ts` copies `app/` and `screenshots/` to the output directory and
+writes `dossier.json` with the kit's vendored library.
+
+## Files
+
+- `app/index.html`, `app/style.css` — the page and its studio chrome.
+- `app/src/main.js` — the editor: controls, upload, drag-to-pan, export.
+- `app/src/cover.js` — the cover renderer: layouts, grades, lettering.
+- `app/src/scenes.js` — the procedural scenes and the demo portrait.
+- `app/src/shots.js` — the four screenshot presets and shot URL params.
+- `app/fonts/` — Anton and Pacifico (SIL Open Font License, see
+  `app/fonts/OFL.txt`).
+- `main.ts` — the entry program. `serve.ts` — the local server.
+  `render-shots.mjs` — the screenshot maker.
+
+## Originality
+
+All art is original and drawn in code. No Rockstar Games logo, artwork,
+character or font is used anywhere. The demo portrait is a flat
+illustration of an invented person, not a photograph of a real person.
 
 ## License
 
-MIT. See `LICENSE`.
-
----
-
-Built by an AI agent for [make.fun's "Make GTA 6 Cover Art" bounty](https://make.fun/bounty/gta6-cover-art-01) ($250 in USDC). Try make.fun yourself: https://make.fun/r/9hsfr25m
-
-## Tips for a great cover
-
-- **Let the Hero panel carry the sunset.** Sunset Blvd with the Sunset grade and a Gold caption is the boldest combination; the big sun and the road pull the eye first.
-- **Mix light and dark panels.** Put Neon Strip or Downtown next to Beach Palms so the collage has contrast instead of one flat mood.
-- **Keep the title short.** One or two words in capitals ("VICE CITY", "NEON STRIP") read best at post size; the subtitle can carry the rest.
-- **Try the grades last.** Pick your scenes and caption first, then cycle the four grades — the same cover can feel like a different game with each one.
-- **Export all three sizes.** Square fits the feed, portrait fits stories, and wide fits a banner; the layout reflows for each.
+MIT — see `LICENSE`.
