@@ -1,80 +1,46 @@
-// Vice Cover Studio — a tiny static file server for app/ (Node 22+, standard
-// library only). A development convenience: `node serve.ts` puts the app on
-// http://localhost:8080 so it can be tried in a desktop browser. It serves
-// only files under app/, nothing outside it, and nothing but static files.
+// serve.ts — tiny static server for trying Vice Cover Studio locally.
+// Serves this repository's files at http://localhost:8080 (or $PORT).
+// No build step, no network: the app is plain files under app/.
 
-import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize, resolve, sep } from 'node:path';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const appDir = resolve(fileURLToPath(new URL('./app', import.meta.url)));
+const root = fileURLToPath(new URL('.', import.meta.url));
+const port = Number(process.env.PORT || 8080);
 
-const flagIndex = process.argv.indexOf('--port');
-const wanted = flagIndex === -1 ? NaN : Number(process.argv[flagIndex + 1]);
-const listenPort = Number.isInteger(wanted) && wanted > 0 && wanted < 65536 ? wanted : 8080;
-
-const mediaTypes = {
+const TYPES = {
   '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-  '.ttf': 'font/ttf',
-  '.otf': 'font/otf',
-  '.wasm': 'application/wasm',
-  '.wav': 'audio/wav',
-  '.mp3': 'audio/mpeg',
-  '.ogg': 'audio/ogg',
-  '.txt': 'text/plain; charset=utf-8',
+  '.ts': 'text/plain; charset=utf-8',
 };
 
-/** The file under app/ a request path names, or null when it escapes app/. */
-function fileForRequest(requestPath) {
-  let path = requestPath;
-  if (path.endsWith('/')) path += 'index.html';
-  const target = resolve(join(appDir, normalize(path)));
-  if (target !== appDir && !target.startsWith(appDir + sep)) return null;
-  return target;
-}
+const server = createServer((req, res) => {
+  const path = normalize(join(root, decodeURIComponent(req.url.split('?')[0])));
+  if (!path.startsWith(root)) {
+    res.writeHead(403);
+    res.end('forbidden');
+    return;
+  }
+  let file = path;
+  if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
+  if (!existsSync(file) || statSync(file).isDirectory()) {
+    res.writeHead(404);
+    res.end('not found');
+    return;
+  }
+  res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
+  res.end(readFileSync(file));
+});
 
-createServer((request, response) => {
-  let pathname = '/';
-  try {
-    pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname);
-  } catch {
-    response.writeHead(400).end('bad request');
-    return;
-  }
-  const file = fileForRequest(pathname);
-  if (file === null) {
-    response.writeHead(403).end('forbidden');
-    return;
-  }
-  let size;
-  try {
-    const info = statSync(file);
-    if (!info.isFile()) throw new Error('not a file');
-    size = info.size;
-  } catch {
-    response.writeHead(404).end('not found');
-    return;
-  }
-  response.writeHead(200, {
-    'content-type': mediaTypes[extname(file).toLowerCase()] ?? 'application/octet-stream',
-    'content-length': size,
-    'cache-control': 'no-store',
-  });
-  createReadStream(file).pipe(response);
-}).listen(listenPort, '127.0.0.1', () => {
-  console.log(`Vice Cover Studio is on http://localhost:${listenPort}`);
+server.listen(port, () => {
+  console.log(`Vice Cover Studio at http://localhost:${port}/app/index.html`);
 });
